@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Portal</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React CDN -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- Babel Standalone for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- React Router (via CDN) -->
+    <script src="https://unpkg.com/react-router-dom@5.3.4/umd/react-router-dom.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+                'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+                sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const { BrowserRouter, Route, Redirect, Switch, useHistory } = ReactRouterDOM;
+
+        // API Base URL
+        const API_BASE_URL = 'http://localhost:3111/admin';
+        const PUBLIC_API_BASE_URL = 'http://localhost:3111';
+
+        // Utility Functions
+        const getToken = () => localStorage.getItem('adminToken');
+        const setToken = (token) => localStorage.setItem('adminToken', token);
+        const removeToken = () => localStorage.removeItem('adminToken');
+        const getAdminData = () => JSON.parse(localStorage.getItem('adminData') || 'null');
+        const setAdminData = (data) => localStorage.setItem('adminData', JSON.stringify(data));
+
+        // Protected Route Component
+        const ProtectedRoute = ({ children }) => {
+            const token = getToken();
+            if (!token) {
+                return <Redirect to="/login" />;
+            }
+            return children;
+        };
+
+        // Login Component
+        const Login = () => {
+            const history = useHistory();
+            const [formData, setFormData] = useState({ Email: '', Password: '' });
+            const [error, setError] = useState('');
+            const [loading, setLoading] = useState(false);
+
+            useEffect(() => {
+                if (getToken()) {
+                    history.replace('/dashboard');
+                }
+            }, [history]);
+
+            const handleChange = (e) => {
+                setFormData({ ...formData, [e.target.name]: e.target.value });
+                setError('');
+            };
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setError('');
+                setLoading(true);
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}/login`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(formData),
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        setToken(data.token);
+                        setAdminData(data.data);
+                        history.replace('/dashboard');
+                    } else {
+                        setError(data.message || 'Login failed. Please try again.');
+                    }
+                } catch (err) {
+                    setError('Network error. Please check your connection.');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
+                        <div className="text-center mb-8">
+                            <h1 className="text-3xl font-bold text-gray-800 mb-2">Admin Login</h1>
+                            <p className="text-gray-600">Sign in to your admin account</p>
+                        </div>
+
+                        {error && (
+                            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+                                {error}
+                            </div>
+                        )}
+
+                        <form onSubmit={handleSubmit} className="space-y-6">
+                            <div>
+                                <label htmlFor="Email" className="block text-sm font-medium text-gray-700 mb-2">
+                                    Email Address
+                                </label>
+                                <input
+                                    type="email"
+                                    id="Email"
+                                    name="Email"
+                                    value={formData.Email}
+                                    onChange={handleChange}
+                                    required
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
+                                    placeholder="admin@example.com"
+                                />
+                            </div>
+
+                            <div>
+                                <label htmlFor="Password" className="block text-sm font-medium text-gray-700 mb-2">
+                                    Password
+                                </label>
+                                <input
+                                    type="password"
+                                    id="Password"
+                                    name="Password"
+                                    value={formData.Password}
+                                    onChange={handleChange}
+                                    required
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
+                                    placeholder="Enter your password"
+                                />
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {loading ? 'Logging in...' : 'Login'}
+                            </button>
+                        </form>
+
+                        <div className="mt-6 text-center">
+                            <p className="text-gray-600">
+                                Don't have an account?{' '}
+                                <button
+                                    onClick={() => history.push('/signup')}
+                                    className="text-indigo-600 hover:text-indigo-700 font-semibold"
+                                >
+                                    Sign Up
+                                </button>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Signup Component
+        const Signup = () => {
+            const history = useHistory();
+            const [formData, setFormData] = useState({
+                Email: '',
+                Password: '',
+                Name: '',
+                Role: 'admin'
+            });
+            const [error, setError] = useState('');
+            const [success, setSuccess] = useState('');
+            const [loading, setLoading] = useState(false);
+
+            useEffect(() => {
+                if (getToken()) {
+                    history.replace('/dashboard');
+                }
+            }, [history]);
+
+            const handleChange = (e) => {
+                setFormData({ ...formData, [e.target.name]: e.target.value });
+                setError('');
+                setSuccess('');
+            };
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setError('');
+                setSuccess('');
+                setLoading(true);
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}/signup`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(formData),
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        setSuccess('Account created successfully! Redirecting to dashboard...');
+                        setToken(data.token);
+                        setAdminData(data.data);
+                        setTimeout(() => {
+                            history.replace('/dashboard');
+                        }, 1500);
+                    } else {
+                        setError(data.message || 'Signup failed. Please try again.');
+                    }
+                } catch (err) {
+                    setError('Network error. Please check your connection.');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
+                        <div className="text-center mb-8">
+                            <h1 className="text-3xl font-bold text-gray-800 mb-2">Admin Signup</h1>
+                            <p className="text-gray-600">Create a new admin account</p>
+                        </div>
+
+                        {error && (
+                            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+                                {error}
+                            </div>
+                        )}
+
+                        {success && (
+                            <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded-lg">
+                                {success}
+                            </div>
+                        )}
+
+                        <form onSubmit={handleSubmit} className="space-y-6">
+                            <div>
+                                <label htmlFor="Name" className="block text-sm font-medium text-gray-700 mb-2">
+                                    Full Name
+                                </label>
+                                <input
+                                    type="text"
+                                    id="Name"
+                                    name="Name"
+                                    value={formData.Name}
+                                    onChange={handleChange}
+                                    required
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
+                                    placeholder="John Admin"
+                                />
+                            </div>
+
+                            <div>
+                                <label htmlFor="Email" className="block text-sm font-medium text-gray-700 mb-2">
+                                    Email Address
+                                </label>
+                                <input
+                                    type="email"
+                                    id="Email"
+                                    name="Email"
+                                    value={formData.Email}
+                                    onChange={handleChange}
+                                    required
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
+                                    placeholder="admin@example.com"
+                                />
+                            </div>
+
+                            <div>
+                                <label htmlFor="Password" className="block text-sm font-medium text-gray-700 mb-2">
+                                    Password
+                                </label>
+                                <input
+                                    type="password"
+                                    id="Password"
+                                    name="Password"
+                                    value={formData.Password}
+                                    onChange={handleChange}
+                                    required
+                                    minLength="6"
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
+                                    placeholder="Enter a strong password"
+                                />
+                            </div>
+
+                            <div>
+                                <label htmlFor="Role" className="block text-sm font-medium text-gray-700 mb-2">
+                                    Role
+                                </label>
+                                <select
+                                    id="Role"
+                                    name="Role"
+                                    value={formData.Role}
+                                    onChange={handleChange}
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
+                                >
+                                    <option value="admin">Admin</option>
+                                    <option value="superadmin">Super Admin</option>
+                                </select>
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {loading ? 'Creating Account...' : 'Sign Up'}
+                            </button>
+                        </form>
+
+                        <div className="mt-6 text-center">
+                            <p className="text-gray-600">
+                                Already have an account?{' '}
+                                <button
+                                    onClick={() => history.push('/login')}
+                                    className="text-indigo-600 hover:text-indigo-700 font-semibold"
+                                >
+                                    Login
+                                </button>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        // Dashboard Component
+        const Dashboard = () => {
+            const history = useHistory();
+            const [adminData, setAdminData] = useState(getAdminData());
+            const [loading, setLoading] = useState(true);
+            const [error, setError] = useState('');
+            const [loanData, setLoanData] = useState([]);
+            const [loanDataLoading, setLoanDataLoading] = useState(false);
+            const [loanDataError, setLoanDataError] = useState('');
+            const [searchName, setSearchName] = useState('');
+            const [currentPage, setCurrentPage] = useState(1);
+            const [pagination, setPagination] = useState({});
+            const [selectedLoan, setSelectedLoan] = useState(null);
+
+            useEffect(() => {
+                fetchProfile();
+                fetchLoanData();
+            }, []);
+
+            useEffect(() => {
+                if (currentPage || searchName !== undefined) {
+                    fetchLoanData();
+                }
+            }, [currentPage]);
+
+            const fetchProfile = async () => {
+                const token = getToken();
+                if (!token) {
+                    history.replace('/login');
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}/profile`, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json',
+                        },
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        setAdminData(data.data);
+                    } else {
+                        if (response.status === 401) {
+                            removeToken();
+                            history.replace('/login');
+                        } else {
+                            setError(data.message || 'Failed to fetch profile');
+                        }
+                    }
+                } catch (err) {
+                    setError('Network error. Please check your connection.');
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const fetchLoanData = async () => {
+                const token = getToken();
+                if (!token) return;
+
+                setLoanDataLoading(true);
+                setLoanDataError('');
+
+                try {
+                    const queryParams = new URLSearchParams({
+                        page: currentPage.toString(),
+                        limit: '10'
+                    });
+                    if (searchName) {
+                        queryParams.append('name', searchName);
+                    }
+
+                    const response = await fetch(`${API_BASE_URL}/loan-data?${queryParams}`, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json',
+                        },
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        setLoanData(data.data);
+                        setPagination(data.pagination || {});
+                    } else {
+                        if (response.status === 401) {
+                            removeToken();
+                            history.replace('/login');
+                        } else {
+                            setLoanDataError(data.message || 'Failed to fetch loan data');
+                        }
+                    }
+                } catch (err) {
+                    setLoanDataError('Network error. Please check your connection.');
+                } finally {
+                    setLoanDataLoading(false);
+                }
+            };
+
+            const handleSearch = (e) => {
+                e.preventDefault();
+                setCurrentPage(1);
+                fetchLoanData();
+            };
+
+            const handleLogout = () => {
+                removeToken();
+                localStorage.removeItem('adminData');
+                history.replace('/login');
+            };
+
+            const formatLoanData = (data) => {
+                if (typeof data === 'object' && data !== null) {
+                    return JSON.stringify(data, null, 2);
+                }
+                return String(data);
+            };
+
+            if (loading) {
+                return (
+                    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+                        <div className="text-center">
+                            <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
+                            <p className="mt-4 text-gray-600">Loading...</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-gray-50">
+                    {/* Header */}
+                    <header className="bg-white shadow-sm border-b border-gray-200">
+                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                            <div className="flex justify-between items-center py-4">
+                                <h1 className="text-2xl font-bold text-gray-800">Admin Dashboard</h1>
+                                <button
+                                    onClick={handleLogout}
+                                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition"
+                                >
+                                    Logout
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Main Content */}
+                    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                        {error && (
+                            <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+                                {error}
+                            </div>
+                        )}
+
+                        {/* Welcome Section */}
+                        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+                            <h2 className="text-xl font-semibold text-gray-800 mb-4">Welcome Back!</h2>
+                            <p className="text-gray-600">
+                                You are successfully logged in to the admin dashboard.
+                            </p>
+                        </div>
+
+                        {/* Admin Info Cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+                            {/* Profile Card */}
+                            <div className="bg-white rounded-xl shadow-sm p-6">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-lg font-semibold text-gray-800">Profile Information</h3>
+                                    <div className="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center">
+                                        <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                        </svg>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <div>
+                                        <p className="text-sm text-gray-500">Name</p>
+                                        <p className="text-gray-800 font-medium">{adminData?.Name || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-500">Email</p>
+                                        <p className="text-gray-800 font-medium">{adminData?.Email || 'N/A'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-500">Role</p>
+                                        <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+                                            adminData?.Role === 'superadmin' 
+                                                ? 'bg-purple-100 text-purple-800' 
+                                                : 'bg-blue-100 text-blue-800'
+                                        }`}>
+                                            {adminData?.Role || 'N/A'}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Status Card */}
+                            <div className="bg-white rounded-xl shadow-sm p-6">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-lg font-semibold text-gray-800">Account Status</h3>
+                                    <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                                        <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <div>
+                                        <p className="text-sm text-gray-500">Status</p>
+                                        <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+                                            adminData?.isActive 
+                                                ? 'bg-green-100 text-green-800' 
+                                                : 'bg-red-100 text-red-800'
+                                        }`}>
+                                            {adminData?.isActive ? 'Active' : 'Inactive'}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-500">Account ID</p>
+                                        <p className="text-gray-800 font-mono text-xs">{adminData?._id || 'N/A'}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Activity Card */}
+                            <div className="bg-white rounded-xl shadow-sm p-6">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-lg font-semibold text-gray-800">Account Details</h3>
+                                    <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center">
+                                        <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <div>
+                                        <p className="text-sm text-gray-500">Created At</p>
+                                        <p className="text-gray-800 font-medium text-sm">
+                                            {adminData?.createdAt 
+                                                ? new Date(adminData.createdAt).toLocaleDateString() 
+                                                : 'N/A'}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-gray-500">Last Updated</p>
+                                        <p className="text-gray-800 font-medium text-sm">
+                                            {adminData?.updatedAt 
+                                                ? new Date(adminData.updatedAt).toLocaleDateString() 
+                                                : 'N/A'}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Loan Data Section */}
+                        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+                            <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-xl font-semibold text-gray-800">Loan Data Management</h2>
+                                <div className="text-sm text-gray-600">
+                                    Total: {pagination.totalItems || 0} entries
+                                </div>
+                            </div>
+
+                            {/* Search Form */}
+                            <form onSubmit={handleSearch} className="mb-6">
+                                <div className="flex gap-4">
+                                    <input
+                                        type="text"
+                                        value={searchName}
+                                        onChange={(e) => setSearchName(e.target.value)}
+                                        placeholder="Search by name..."
+                                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                                    />
+                                    <button
+                                        type="submit"
+                                        className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition"
+                                    >
+                                        Search
+                                    </button>
+                                    {searchName && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setSearchName('');
+                                                setCurrentPage(1);
+                                                fetchLoanData();
+                                            }}
+                                            className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 focus:outline-none transition"
+                                        >
+                                            Clear
+                                        </button>
+                                    )}
+                                </div>
+                            </form>
+
+                            {loanDataError && (
+                                <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+                                    {loanDataError}
+                                </div>
+                            )}
+
+                            {loanDataLoading ? (
+                                <div className="text-center py-8">
+                                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600"></div>
+                                    <p className="mt-2 text-gray-600">Loading loan data...</p>
+                                </div>
+                            ) : loanData.length === 0 ? (
+                                <div className="text-center py-8 text-gray-500">
+                                    <p>No loan data found.</p>
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="overflow-x-auto">
+                                        <table className="min-w-full divide-y divide-gray-200">
+                                            <thead className="bg-gray-50">
+                                                <tr>
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Loan Data</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created At</th>
+                                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="bg-white divide-y divide-gray-200">
+                                                {loanData.map((item) => (
+                                                    <tr key={item._id} className="hover:bg-gray-50">
+                                                        <td className="px-6 py-4 whitespace-nowrap">
+                                                            <div className="text-sm font-medium text-gray-900">{item.name}</div>
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            <div className="text-sm text-gray-500 max-w-xs truncate">
+                                                                {typeof item.loanData === 'object' 
+                                                                    ? JSON.stringify(item.loanData).substring(0, 50) + '...'
+                                                                    : String(item.loanData).substring(0, 50) + '...'}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap">
+                                                            <div className="text-sm text-gray-500">
+                                                                {new Date(item.createdAt).toLocaleString()}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                                            <button
+                                                                onClick={() => setSelectedLoan(item)}
+                                                                className="text-indigo-600 hover:text-indigo-900"
+                                                            >
+                                                                View Details
+                                                            </button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    {/* Pagination */}
+                                    {pagination.totalPages > 1 && (
+                                        <div className="mt-6 flex justify-between items-center">
+                                            <div className="text-sm text-gray-700">
+                                                Showing {((currentPage - 1) * 10) + 1} to {Math.min(currentPage * 10, pagination.totalItems)} of {pagination.totalItems} entries
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                                    disabled={currentPage === 1}
+                                                    className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                                                >
+                                                    Previous
+                                                </button>
+                                                <span className="px-4 py-2 text-gray-700">
+                                                    Page {currentPage} of {pagination.totalPages}
+                                                </span>
+                                                <button
+                                                    onClick={() => setCurrentPage(p => Math.min(pagination.totalPages, p + 1))}
+                                                    disabled={currentPage === pagination.totalPages}
+                                                    className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                                                >
+                                                    Next
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </div>
+
+                        {/* Loan Data Detail Modal */}
+                        {selectedLoan && (
+                            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+                                <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                                    <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
+                                        <h3 className="text-xl font-semibold text-gray-800">Loan Data Details</h3>
+                                        <button
+                                            onClick={() => setSelectedLoan(null)}
+                                            className="text-gray-400 hover:text-gray-600"
+                                        >
+                                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    <div className="p-6">
+                                        <div className="mb-4">
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
+                                            <p className="text-gray-900 font-medium">{selectedLoan.name}</p>
+                                        </div>
+                                        <div className="mb-4">
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">Loan Data</label>
+                                            <pre className="bg-gray-50 p-4 rounded-lg border border-gray-200 text-sm overflow-x-auto">
+                                                {formatLoanData(selectedLoan.loanData)}
+                                            </pre>
+                                        </div>
+                                        <div className="mb-4">
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">Created At</label>
+                                            <p className="text-gray-600">{new Date(selectedLoan.createdAt).toLocaleString()}</p>
+                                        </div>
+                                        <div className="mb-4">
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">Updated At</label>
+                                            <p className="text-gray-600">{new Date(selectedLoan.updatedAt).toLocaleString()}</p>
+                                        </div>
+                                        <div className="mb-4">
+                                            <label className="block text-sm font-medium text-gray-700 mb-2">ID</label>
+                                            <p className="text-gray-600 font-mono text-xs">{selectedLoan._id}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </main>
+                </div>
+            );
+        };
+
+        // Main App Component
+        const App = () => {
+            return (
+                <BrowserRouter>
+                    <Switch>
+                        <Route exact path="/login" component={Login} />
+                        <Route exact path="/signup" component={Signup} />
+                        <Route
+                            exact
+                            path="/dashboard"
+                            render={() => (
+                                <ProtectedRoute>
+                                    <Dashboard />
+                                </ProtectedRoute>
+                            )}
+                        />
+                        <Route exact path="/" render={() => <Redirect to="/login" />} />
+                    </Switch>
+                </BrowserRouter>
+            );
+        };
+
+        // Render App
+        ReactDOM.render(<App />, document.getElementById('root'));
+    </script>
+</body>
+</html>
